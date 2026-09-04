@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - healthify.yaml
+images:
+  - name: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-auth
+    newName: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-auth
+    newTag: latest
+  - name: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-report
+    newName: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-report
+    newTag: latest
+  - name: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-ai
+    newName: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-ai
+    newTag: latest
+  - name: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-gateway
+    newName: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-gateway
+    newTag: latest
+  - name: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-frontend
+    newName: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-frontend
+    newTag: latest

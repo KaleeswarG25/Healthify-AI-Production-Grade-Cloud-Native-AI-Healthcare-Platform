@@ -1,4 +1,4 @@
-FROM python:3.11
+Get-Content .env.exampleFROM python:3.11
 
 WORKDIR /app
 
