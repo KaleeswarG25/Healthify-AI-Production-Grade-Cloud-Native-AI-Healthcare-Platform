@@ -25,3 +25,9 @@ output "eks_cluster_security_group_id" {
 output "eks_node_security_group_id" {
   value = aws_security_group.eks_nodes.id
 }
+output "ecr_repository_urls" {
+  value = {
+    for name, repository in aws_ecr_repository.healthify :
+    name => repository.repository_url
+  }
+}
