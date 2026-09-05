@@ -4,15 +4,12 @@ from typing import Optional
 import requests
 from dotenv import load_dotenv
 
-
 load_dotenv()
-
 
 OLLAMA_URL = os.getenv("OLLAMA_URL")
 
 if not OLLAMA_URL:
     raise RuntimeError("OLLAMA_URL environment variable is required")
-
 
 MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:1b")
 
@@ -24,6 +21,9 @@ NUM_PREDICT = int(
     os.getenv("OLLAMA_NUM_PREDICT", "256")
 )
 
+MAX_REPORT_TEXT_LENGTH = int(
+    os.getenv("MAX_REPORT_TEXT_LENGTH", "50000")
+)
 
 DEFAULT_SYSTEM_PROMPT = """
 You are an AI assistant for a health application.
@@ -116,6 +116,11 @@ def analyze_medical_report(report_text: str) -> dict:
             "Medical report text cannot be empty"
         )
 
+    if len(report_text) > MAX_REPORT_TEXT_LENGTH:
+        raise ValueError(
+            "Medical report text is too large"
+        )
+
     prompt = f"""
 Analyze the following medical report.
 
@@ -180,4 +185,4 @@ User question:
 Explain the answer clearly and avoid making a diagnosis.
 """
 
-    return generate_ai_response(prompt) 
+    return generate_ai_response(prompt)
