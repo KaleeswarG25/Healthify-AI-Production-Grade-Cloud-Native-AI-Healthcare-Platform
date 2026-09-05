@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: healthify-config
+  namespace: {{ .Values.namespace }}
+data:
+  AWS_REGION: {{ .Values.s3.region | quote }}
+  S3_BUCKET: {{ .Values.s3.bucket | quote }}
+
+  JWT_ALGORITHM: "HS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "120"
+
+  OLLAMA_URL: "http://ollama:11434/api/generate"
+  OLLAMA_MODEL: "llama3.2:1b"
+  OLLAMA_NUM_CTX: "4096"
+  OLLAMA_NUM_PREDICT: "256"
+  MAX_REPORT_TEXT_LENGTH: "50000"

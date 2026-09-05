@@ -1,255 +1,139 @@
-# Default values for AIHealth Helm chart
-global:
-  # Global image configuration
-  imageRegistry: ""
-  imagePullSecrets: []
-  storageClass: ""
+namespace: healthify
 
-  # Global replica configuration
-  replicas: 1
+imagePullSecrets: []
 
-  # Global image configuration
+frontend:
   image:
-    registry: ""
     repository: ""
     tag: "latest"
     pullPolicy: IfNotPresent
-
-  # Global environment variables
-  env: {}
-
-  # Global resource limits
+  replicas: 2
+  service:
+    port: 80
   resources:
     requests:
       cpu: 100m
       memory: 128Mi
     limits:
       cpu: 500m
-      memory: 512Mi
+      memory: 256Mi
 
-# PostgreSQL configuration
-postgresql:
-  enabled: true
-  auth:
-    postgresPassword: "changeme"
-    username: "aihealth"
-    password: "changeme"
-    database: "aihealth"
-  architecture: standalone
-  primary:
-    persistence:
-      enabled: true
-      size: 8Gi
-    resources:
-      requests:
-        cpu: 250m
-        memory: 256Mi
-      limits:
-        cpu: 500m
-        memory: 512Mi
-
-# Redis configuration
-redis:
-  enabled: true
-  architecture: standalone
-  auth:
-    enabled: false
-  master:
-    persistence:
-      enabled: true
-      size: 8Gi
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 200m
-        memory: 256Mi
-
-# Auth Service configuration
-authService:
-  enabled: true
-  name: auth-service
+gateway:
   image:
-    repository: your-registry/auth-service
+    repository: ""
     tag: "latest"
     pullPolicy: IfNotPresent
-  port: 8000
-  replicas: 1
+  replicas: 2
   service:
-    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+auth:
+  image:
+    repository: ""
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  replicas: 2
+  service:
     port: 8000
   resources:
     requests:
       cpu: 100m
-      memory: 128Mi
+      memory: 256Mi
     limits:
       cpu: 500m
       memory: 512Mi
-  env:
-    - name: DATABASE_URL
-      value: "postgresql://aihealth:changeme@postgresql:5432/aihealth"
-    - name: JWT_SECRET
-      value: "your-jwt-secret-key"
-    - name: REDIS_URL
-      value: "redis://redis-master:6379"
 
-# Report Service configuration
-reportService:
-  enabled: true
-  name: report-service
+report:
   image:
-    repository: your-registry/report-service
+    repository: ""
     tag: "latest"
     pullPolicy: IfNotPresent
-  port: 8001
-  replicas: 1
+  replicas: 2
   service:
-    type: ClusterIP
     port: 8001
   resources:
     requests:
-      cpu: 200m
+      cpu: 100m
       memory: 256Mi
     limits:
-      cpu: 1000m
-      memory: 1Gi
-  env:
-    - name: DATABASE_URL
-      value: "postgresql://aihealth:changeme@postgresql:5432/aihealth"
-    - name: AWS_ACCESS_KEY_ID
-      value: "your-aws-access-key"
-    - name: AWS_SECRET_ACCESS_KEY
-      value: "your-aws-secret-key"
-    - name: AWS_S3_BUCKET
-      value: "your-s3-bucket"
-    - name: REDIS_URL
-      value: "redis://redis-master:6379"
+      cpu: 500m
+      memory: 512Mi
 
-# AI Service configuration
-aiService:
-  enabled: true
-  name: ai-service
+ai:
   image:
-    repository: your-registry/ai-service
+    repository: ""
     tag: "latest"
     pullPolicy: IfNotPresent
-  port: 8002
   replicas: 1
   service:
-    type: ClusterIP
     port: 8002
   resources:
     requests:
-      cpu: 500m
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
       memory: 1Gi
-    limits:
-      cpu: 2000m
-      memory: 2Gi
-  env:
-    - name: DATABASE_URL
-      value: "postgresql://aihealth:changeme@postgresql:5432/aihealth"
-    - name: REDIS_URL
-      value: "redis://redis-master:6379"
 
-# Gateway (Nginx) configuration
-gateway:
-  enabled: true
-  name: gateway
+ollama:
   image:
-    repository: nginx
-    tag: "1.25-alpine"
-    pullPolicy: IfNotPresent
-  port: 80
-  replicas: 1
-  service:
-    type: ClusterIP
-    port: 80
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 100m
-      memory: 128Mi
-
-# Frontend configuration
-frontend:
-  enabled: true
-  name: frontend
-  image:
-    repository: your-registry/frontend
+    repository: ollama/ollama
     tag: "latest"
     pullPolicy: IfNotPresent
-  port: 80
   replicas: 1
   service:
-    type: ClusterIP
-    port: 80
+    port: 11434
   resources:
     requests:
-      cpu: 50m
-      memory: 64Mi
+      cpu: "1"
+      memory: 2Gi
     limits:
-      cpu: 100m
-      memory: 128Mi
+      cpu: "2"
+      memory: 4Gi
 
-# Monitoring configuration
-monitoring:
-  enabled: true
+database:
+  host: ""
+  port: 5432
+  name: healthai
 
-prometheus:
-  server:
-    persistentVolume:
-      enabled: true
-      size: 8Gi
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-      limits:
-        cpu: 200m
-        memory: 512Mi
-    retention: "15d"
+s3:
+  bucket: ""
+  region: ap-south-1
 
-grafana:
-  adminPassword: "admin"
-  persistence:
-    enabled: true
-    size: 8Gi
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 200m
-      memory: 256Mi
+secrets:
+  existingSecret: healthify-secrets
 
-# Autoscaling configuration
 autoscaling:
   enabled: true
-  minReplicas: 1
+  minReplicas: 2
   maxReplicas: 5
   targetCPUUtilizationPercentage: 70
-  targetMemoryUtilizationPercentage: 80
 
-# Network policies
-networkPolicy:
-  enabled: true
-
-# Pod disruption budget
 podDisruptionBudget:
   enabled: true
   minAvailable: 1
-
-# Ingress configuration
-ingress:
-  enabled: false
-  className: ""
-  annotations: {}
-  hosts:
-    - host: aihealth.local
-      paths:
-        - path: /
-          pathType: Prefix
-  tls: []
+ollama:
+  image:
+    repository: ollama/ollama
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    port: 11434
+  storage:
+    size: 20Gi
+    storageClass: gp3
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi

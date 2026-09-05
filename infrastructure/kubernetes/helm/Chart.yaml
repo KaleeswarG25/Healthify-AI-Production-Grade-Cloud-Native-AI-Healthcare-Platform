@@ -1,24 +1,6 @@
 apiVersion: v2
-name: aihealth
-description: A Helm chart for AIHealth microservices application
+name: healthify
+description: Production deployment chart for AI Health
 type: application
-version: 0.1.0
+version: 1.0.0
 appVersion: "1.0.0"
-
-dependencies:
-  - name: postgresql
-    version: "15.2.0"
-    repository: "https://charts.bitnami.com/bitnami"
-    condition: postgresql.enabled
-  - name: redis
-    version: "18.1.4"
-    repository: "https://charts.bitnami.com/bitnami"
-    condition: redis.enabled
-  - name: prometheus
-    version: "25.0.0"
-    repository: "https://prometheus-community.github.io/helm-charts"
-    condition: monitoring.enabled
-  - name: grafana
-    version: "7.3.0"
-    repository: "https://grafana.github.io/helm-charts"
-    condition: monitoring.enabled
