@@ -40,7 +40,7 @@ resource "aws_subnet" "private" {
 
   vpc_id            = aws_vpc.healthify.id
   availability_zone = var.availability_zones[count.index]
-  cidr_block         = cidrsubnet(var.vpc_cidr, 4, count.index + 3)
+  cidr_block        = cidrsubnet(var.vpc_cidr, 4, count.index + 3)
 
   tags = {
     Name = "${var.project_name}-private-${count.index + 1}"

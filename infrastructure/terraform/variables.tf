@@ -1,106 +1,126 @@
-# Project Configuration
-variable "project_name" {
-  description = "Name of the project"
+variable "aws_region" {
+  description = "AWS region"
   type        = string
-  default     = "aihealth"
+  default     = "ap-south-1"
 }
 
 variable "environment" {
-  description = "Environment name"
+  description = "Deployment environment"
   type        = string
-  default     = "dev"
+  default     = "production"
 }
 
-# VPC Configuration
-variable "vpc_cidr" {
-  description = "CIDR block for VPC"
+variable "project_name" {
+  description = "Project name"
   type        = string
-  default     = "10.0.0.0/16"
+  default     = "healthify"
+}
+
+variable "vpc_cidr" {
+  description = "VPC CIDR"
+  type        = string
+  default     = "10.20.0.0/16"
 }
 
 variable "availability_zones" {
-  description = "List of availability zones"
+  description = "Availability zones"
   type        = list(string)
-  default     = ["us-east-1a", "us-east-1b", "us-east-1c"]
+
+  default = [
+    "ap-south-1a",
+    "ap-south-1b",
+    "ap-south-1c"
+  ]
 }
 
-variable "public_subnet_cidrs" {
-  description = "CIDR blocks for public subnets"
+variable "eks_version" {
+  description = "EKS Kubernetes version"
+  type        = string
+  default     = "1.33"
+}
+
+variable "general_instance_types" {
+  description = "EC2 instance types for general EKS nodes"
   type        = list(string)
-  default     = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+
+  default = [
+    "t3.large"
+  ]
 }
 
-variable "private_subnet_cidrs" {
-  description = "CIDR blocks for private subnets"
+variable "gpu_instance_types" {
+  description = "EC2 instance types for Ollama GPU nodes"
   type        = list(string)
-  default     = ["10.0.10.0/24", "10.0.11.0/24", "10.0.12.0/24"]
+
+  default = [
+    "g4dn.xlarge"
+  ]
 }
 
-variable "enable_nat_gateway" {
-  description = "Enable NAT Gateway for private subnets"
-  type        = bool
-  default     = true
+variable "general_min_size" {
+  type    = number
+  default = 2
 }
 
-# Database Configuration
-variable "db_name" {
-  description = "Database name"
-  type        = string
-  default     = "healthai"
+variable "general_max_size" {
+  type    = number
+  default = 4
 }
 
-variable "db_username" {
-  description = "Database username"
-  type        = string
-  default     = "postgres"
+variable "general_desired_size" {
+  type    = number
+  default = 2
 }
 
-variable "db_password" {
-  description = "Database password"
-  type        = string
-  sensitive   = true
+variable "gpu_min_size" {
+  type    = number
+  default = 0
 }
 
-variable "db_instance_class" {
+variable "gpu_max_size" {
+  type    = number
+  default = 1
+}
+
+variable "gpu_desired_size" {
+  type    = number
+  default = 0
+}
+
+variable "rds_instance_class" {
   description = "RDS instance class"
   type        = string
-  default     = "db.r6g.large"
+  default     = "db.t4g.micro"
 }
 
-# S3 Configuration
+variable "rds_allocated_storage" {
+  description = "RDS storage in GB"
+  type        = number
+  default     = 20
+}
+
+variable "rds_database_name" {
+  type    = string
+  default = "healthai"
+}
+
+variable "rds_username" {
+  type      = string
+  sensitive = true
+}
+
+variable "rds_password" {
+  type      = string
+  sensitive = true
+}
+
 variable "s3_bucket_name" {
-  description = "Name of the S3 bucket"
+  description = "Globally unique S3 bucket name"
   type        = string
 }
 
-# EC2 Configuration
-variable "create_bastion" {
-  description = "Create bastion host"
-  type        = bool
-  default     = false
-}
-
-variable "bastion_ami" {
-  description = "AMI ID for bastion host"
+variable "github_repository" {
+  description = "GitHub repository for OIDC"
   type        = string
-  default     = "ami-0c7217cdde317cfec" # Amazon Linux 2
-}
-
-variable "bastion_instance_type" {
-  description = "Instance type for bastion host"
-  type        = string
-  default     = "t3.micro"
-}
-
-variable "key_pair_name" {
-  description = "Name of the EC2 key pair"
-  type        = string
-  default     = ""
-}
-
-# Tags
-variable "common_tags" {
-  description = "Common tags to be applied to all resources"
-  type        = map(string)
-  default     = {}
+  default     = "KaleeswarG25/healthify_AI"
 }

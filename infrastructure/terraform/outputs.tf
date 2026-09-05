@@ -31,3 +31,21 @@ output "ecr_repository_urls" {
     name => repository.repository_url
   }
 }
+output "rds_endpoint" {
+  value = aws_db_instance.healthify.address
+}
+
+output "rds_port" {
+  value = aws_db_instance.healthify.port
+}
+
+output "rds_database_name" {
+  value = aws_db_instance.healthify.db_name
+}
+output "s3_bucket_name" {
+  value = aws_s3_bucket.healthify_reports.bucket
+}
+
+output "s3_bucket_arn" {
+  value = aws_s3_bucket.healthify_reports.arn
+}
