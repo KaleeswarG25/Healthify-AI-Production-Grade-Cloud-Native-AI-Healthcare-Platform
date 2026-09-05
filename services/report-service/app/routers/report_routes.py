@@ -1,150 +1,237 @@
-# report-service/app/routers/report_routes.py
-from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
+import os
+import uuid
+from typing import Generator
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    status,
+)
 from sqlalchemy.orm import Session
-from app.s3 import s3_client, BUCKET_NAME
+
 from app.database import SessionLocal
 from app.models import MedicalReport
-from app.schemas import ReportResponse, PresignedUrlResponse, SaveReportRequest
-import uuid
-import os
-from botocore.exceptions import ClientError
-from datetime import datetime
-from typing import List
+from app.s3 import BUCKET_NAME, s3_client
+from app.schemas import (
+    PresignedUrlResponse,
+    ReportResponse,
+    SaveReportRequest,
+)
+from app.security import get_current_user
+
 
 router = APIRouter()
 
-def get_db():
+
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
+
     try:
         yield db
     finally:
         db.close()
 
-@router.get("/generate-upload-url", response_model=PresignedUrlResponse)
+
+# ============================================================
+# GENERATE S3 UPLOAD URL
+# ============================================================
+
+@router.get(
+    "/generate-upload-url",
+    response_model=PresignedUrlResponse,
+)
 async def generate_upload_url(
     file_name: str = Query(...),
-    content_type: str = Query("application/pdf"),
-    user_id: int = Query(...)
+    content_type: str = Query(...),
+    current_user: dict = Depends(get_current_user),
 ):
-    """Generate pre-signed URL for S3 upload"""
-    try:
-        # Validate file type
-        allowed_types = {"application/pdf", "image/jpeg", "image/png"}
-        if content_type not in allowed_types:
-            raise HTTPException(400, "File type not allowed")
+    user_id = current_user["user_id"]
 
-        # Generate unique file key
-        ext = os.path.splitext(file_name)[1]
-        if not ext:
-            ext_map = {
-                "application/pdf": ".pdf",
-                "image/jpeg": ".jpg",
-                "image/png": ".png"
-            }
-            ext = ext_map.get(content_type, "")
-        
-        unique_id = str(uuid.uuid4())
-        file_key = f"users/{user_id}/reports/{unique_id}{ext}"
-        
-        # Generate pre-signed URL
-        url = s3_client.generate_presigned_url(
-            'put_object',
+    allowed_types = {
+        "application/pdf": ".pdf",
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+    }
+
+    if content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only PDF, JPEG and PNG files are supported",
+        )
+
+    extension = allowed_types[content_type]
+
+    safe_name = os.path.basename(file_name)
+
+    file_key = (
+        f"users/{user_id}/reports/"
+        f"{uuid.uuid4()}{extension}"
+    )
+
+    try:
+        upload_url = s3_client.generate_presigned_url(
+            ClientMethod="put_object",
             Params={
-                'Bucket': BUCKET_NAME,
-                'Key': file_key,
-                'ContentType': content_type
+                "Bucket": BUCKET_NAME,
+                "Key": file_key,
+                "ContentType": content_type,
             },
             ExpiresIn=300,
-            HttpMethod='PUT'
         )
-        
-        return {
-            "upload_url": url,
-            "file_key": file_key,
-            "expires_in": 300
-        }
-        
-    except ClientError as e:
-        raise HTTPException(500, f"AWS Error: {str(e)}")
 
-@router.post("/save-report", response_model=ReportResponse)
+        return PresignedUrlResponse(
+            upload_url=upload_url,
+            file_key=file_key,
+            expires_in=300,
+        )
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unable to generate upload URL: {str(exc)}",
+        )
+
+
+# ============================================================
+# SAVE REPORT METADATA
+# ============================================================
+
+@router.post(
+    "/save-report",
+    response_model=ReportResponse,
+)
 async def save_report(
     request: SaveReportRequest,
-    db: Session = Depends(get_db)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """Save report metadata after upload"""
-    try:
-        # Verify file exists in S3
-        try:
-            response = s3_client.head_object(
-                Bucket=BUCKET_NAME, 
-                Key=request.file_key
-            )
-            if response.get('ContentLength', 0) == 0:
-                raise HTTPException(400, "File is empty")
-        except ClientError as e:
-            if e.response['Error']['Code'] == '404':
-                raise HTTPException(404, "File not found in S3")
-            raise
+    user_id = current_user["user_id"]
 
-        # Save to database
-        s3_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{request.file_key}"
-        
-        db_report = MedicalReport(
-            user_id=request.user_id,
-            file_name=request.file_name,
-            s3_url=s3_url,
-            uploaded_at=datetime.utcnow()
+    expected_prefix = f"users/{user_id}/reports/"
+
+    if not request.file_key.startswith(expected_prefix):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid report ownership",
         )
-        
-        db.add(db_report)
-        db.commit()
-        db.refresh(db_report)
-        
-        return db_report
-        
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(500, str(e))
 
-@router.get("/reports", response_model=List[ReportResponse])
+    try:
+        metadata = s3_client.head_object(
+            Bucket=BUCKET_NAME,
+            Key=request.file_key,
+        )
+
+        file_size = metadata.get("ContentLength", 0)
+
+        max_size = 10 * 1024 * 1024
+
+        if file_size > max_size:
+            s3_client.delete_object(
+                Bucket=BUCKET_NAME,
+                Key=request.file_key,
+            )
+
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="File exceeds the 10 MB limit",
+            )
+
+    except HTTPException:
+        raise
+
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file does not exist",
+        )
+
+    report = MedicalReport(
+        user_id=user_id,
+        file_name=request.file_name,
+        s3_url=f"s3://{BUCKET_NAME}/{request.file_key}",
+    )
+
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+
+    return report
+
+
+# ============================================================
+# GET USER REPORTS
+# ============================================================
+
+@router.get(
+    "/reports",
+    response_model=list[ReportResponse],
+)
 async def get_user_reports(
-    user_id: int = Query(...),
-    db: Session = Depends(get_db)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """Get all reports for a user"""
-    reports = db.query(MedicalReport)\
-        .filter(MedicalReport.user_id == user_id)\
-        .order_by(MedicalReport.uploaded_at.desc())\
+    user_id = current_user["user_id"]
+
+    reports = (
+        db.query(MedicalReport)
+        .filter(MedicalReport.user_id == user_id)
+        .order_by(MedicalReport.uploaded_at.desc())
         .all()
+    )
+
     return reports
+
+
+# ============================================================
+# DELETE REPORT
+# ============================================================
 
 @router.delete("/reports/{report_id}")
 async def delete_report(
     report_id: int,
-    user_id: int = Query(...),
-    db: Session = Depends(get_db)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """Delete a report"""
-    report = db.query(MedicalReport).filter(
-        MedicalReport.id == report_id,
-        MedicalReport.user_id == user_id
-    ).first()
-    
+    user_id = current_user["user_id"]
+
+    report = (
+        db.query(MedicalReport)
+        .filter(
+            MedicalReport.id == report_id,
+            MedicalReport.user_id == user_id,
+        )
+        .first()
+    )
+
     if not report:
-        raise HTTPException(404, "Report not found")
-    
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Report not found",
+        )
+
     try:
-        # Delete from S3
-        file_key = '/'.join(report.s3_url.split('/')[3:])
-        s3_client.delete_object(Bucket=BUCKET_NAME, Key=file_key)
-        
-        # Delete from database
-        db.delete(report)
-        db.commit()
-        
-        return {"message": "Report deleted"}
-        
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(500, str(e))
+        s3_key = report.s3_url.split(
+            f"s3://{BUCKET_NAME}/",
+            1,
+        )[1]
+
+        s3_client.delete_object(
+            Bucket=BUCKET_NAME,
+            Key=s3_key,
+        )
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unable to delete S3 object: {str(exc)}",
+        )
+
+    db.delete(report)
+    db.commit()
+
+    return {
+        "message": "Report deleted successfully",
+        "report_id": report_id,
+    }

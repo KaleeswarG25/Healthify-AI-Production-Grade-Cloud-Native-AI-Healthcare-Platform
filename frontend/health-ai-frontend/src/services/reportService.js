@@ -1,66 +1,119 @@
-// src/services/reportService.js
 import { reportApi } from './api';
 
+
 class ReportService {
-  async generateUploadUrl(fileName, fileType, userId) {
-    const response = await reportApi.get('/generate-upload-url', {
-      params: { 
-        file_name: fileName, 
-        content_type: fileType, 
-        user_id: userId 
-      }
-    });
-    return response.data;
+
+  async generateUploadUrl(fileName, fileType) {
+    try {
+      const response = await reportApi.get(
+        '/generate-upload-url',
+        {
+          params: {
+            file_name: fileName,
+            content_type: fileType,
+          },
+        }
+      );
+
+      return response.data;
+
+    } catch (error) {
+      throw (
+        error.response?.data?.detail ||
+        'Failed to generate upload URL'
+      );
+    }
   }
+
 
   async uploadToS3(uploadUrl, file, onProgress) {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable && onProgress) {
-          onProgress(Math.round((e.loaded / e.total) * 100));
+    try {
+      const response = await fetch(
+        uploadUrl,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': file.type,
+          },
+          body: file,
         }
-      });
+      );
 
-      xhr.addEventListener('load', () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve();
-        } else {
-          reject(new Error(`Upload failed: ${xhr.status}`));
+      if (!response.ok) {
+        throw new Error(
+          `S3 upload failed with status ${response.status}`
+        );
+      }
+
+      if (onProgress) {
+        onProgress(100);
+      }
+
+      return true;
+
+    } catch (error) {
+      throw (
+        error.message ||
+        'File upload failed'
+      );
+    }
+  }
+
+
+  async saveReport(fileName, fileKey) {
+    try {
+      const response = await reportApi.post(
+        '/save-report',
+        {
+          file_name: fileName,
+          file_key: fileKey,
         }
-      });
+      );
 
-      xhr.addEventListener('error', () => reject(new Error('Network error')));
-      
-      xhr.open('PUT', uploadUrl);
-      xhr.setRequestHeader('Content-Type', file.type);
-      xhr.send(file);
-    });
+      return response.data;
+
+    } catch (error) {
+      throw (
+        error.response?.data?.detail ||
+        'Failed to save report'
+      );
+    }
   }
 
-  async saveReport(fileName, fileKey, userId) {
-    const response = await reportApi.post('/save-report', {
-      file_name: fileName,
-      file_key: fileKey,
-      user_id: userId
-    });
-    return response.data;
+
+  async getUserReports() {
+    try {
+      const response = await reportApi.get(
+        '/reports'
+      );
+
+      return response.data;
+
+    } catch (error) {
+      throw (
+        error.response?.data?.detail ||
+        'Failed to retrieve reports'
+      );
+    }
   }
 
-  async getUserReports(userId) {
-    const response = await reportApi.get('/reports', {
-      params: { user_id: userId }
-    });
-    return response.data;
-  }
 
-  async deleteReport(reportId, userId) {
-    const response = await reportApi.delete(`/reports/${reportId}`, {
-      params: { user_id: userId }
-    });
-    return response.data;
+  async deleteReport(reportId) {
+    try {
+      const response = await reportApi.delete(
+        `/reports/${reportId}`
+      );
+
+      return response.data;
+
+    } catch (error) {
+      throw (
+        error.response?.data?.detail ||
+        'Failed to delete report'
+      );
+    }
   }
 }
+
 
 export default new ReportService();

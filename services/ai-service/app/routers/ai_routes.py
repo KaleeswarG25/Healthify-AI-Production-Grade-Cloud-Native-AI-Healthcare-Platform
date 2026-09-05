@@ -1,184 +1,342 @@
-# ai-service/app/routers/ai_routes.py
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
-from typing import List
-import os
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
 
+from app.database import SessionLocal
+from app.security import get_current_user
 from app.schemas import (
-    AnalyzeTextRequest, AnalyzeTextResponse,
-    ChatRequest, ChatResponse
+    AnalyzeTextRequest,
+    AnalyzeTextResponse,
+    ChatRequest,
+    ChatResponse,
 )
 from app.ai_engine import analyze_medical_report, answer_question
 from app.pdf_parser import extract_text_from_pdf
 from app.report_context import (
-    create_analysis, get_analysis, set_active_analysis,
-    get_active_analysis, clear_session, get_user_analyses, active_sessions
+    create_analysis,
+    get_analysis,
+    get_user_analyses,
+    delete_analysis,
 )
+
 
 router = APIRouter()
 
-@router.post("/analyze-text", response_model=AnalyzeTextResponse)
-async def analyze_text(request: AnalyzeTextRequest):
-    """
-    Analyze medical report text
-    """
+
+def get_db():
+    db = SessionLocal()
+
     try:
-        # Get AI analysis
+        yield db
+    finally:
+        db.close()
+
+
+# ============================================================
+# ANALYZE TEXT
+# ============================================================
+
+@router.post(
+    "/analyze-text",
+    response_model=AnalyzeTextResponse,
+)
+async def analyze_text(
+    request: AnalyzeTextRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Analyze medical report text.
+
+    The authenticated user's ID is taken from the JWT.
+    The client cannot choose another user ID.
+    """
+
+    user_id = current_user["user_id"]
+
+    if not request.report_text.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Report text cannot be empty",
+        )
+
+    try:
         result = analyze_medical_report(request.report_text)
-        
-        # Store in memory
+
         analysis_id = create_analysis(
-            user_id=request.user_id,
+            db=db,
+            user_id=user_id,
             report_text=request.report_text,
             analysis=result["analysis"],
             summary=result["summary"],
-            filename=request.filename
+            filename=request.filename,
         )
-        
-        # Set as active for this user
-        set_active_analysis(request.user_id, analysis_id)
-        
-        return {
-            "analysis_id": analysis_id,
-            "analysis": result["analysis"],
-            "summary": result["summary"]
-        }
-        
-    except Exception as e:
-        print(f"❌ Analysis error: {str(e)}")
-        raise HTTPException(status_code=503, detail="AI inference is temporarily unavailable") from e
 
-@router.post("/analyze-pdf")
-async def analyze_pdf(
-    user_id: int = Form(...),
-    file: UploadFile = File(...)
-):
-    """
-    Upload and analyze a PDF report
-    """
-    try:
-        # Read file content
-        content = await file.read()
-        
-        # Extract text from PDF
-        extracted_text = extract_text_from_pdf(content)
-        
-        if "Error" in extracted_text:
-            raise HTTPException(status_code=400, detail=extracted_text)
-        
-        # Get AI analysis
-        result = analyze_medical_report(extracted_text)
-        
-        # Store in memory
-        analysis_id = create_analysis(
-            user_id=user_id,
-            report_text=extracted_text,
+        return AnalyzeTextResponse(
+            analysis_id=analysis_id,
             analysis=result["analysis"],
             summary=result["summary"],
-            filename=file.filename
         )
-        
-        # Set as active for this user
-        set_active_analysis(user_id, analysis_id)
-        
-        return {
-            "analysis_id": analysis_id,
-            "filename": file.filename,
-            "analysis": result["analysis"],
-            "summary": result["summary"]
-        }
-        
-    except Exception as e:
-        print(f"❌ PDF Analysis error: {str(e)}")
-        raise HTTPException(status_code=503, detail="AI inference is temporarily unavailable") from e
 
-@router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    """
-    Chat about a previously analyzed report
-    """
-    try:
-        # Get the analysis
-        analysis = get_analysis(request.analysis_id)
-        
-        if not analysis:
-            raise HTTPException(
-                status_code=404, 
-                detail="Analysis not found or expired. Please analyze the report again."
-            )
-        
-        # Verify user owns this analysis
-        if analysis["user_id"] != request.user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
-        # Set as active for this user
-        set_active_analysis(request.user_id, request.analysis_id)
-        
-        # Get AI response
-        response = answer_question(
-            question=request.message,
-            report_context=analysis["report_text"],
-            report_analysis=analysis["analysis"]
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
         )
-        
-        return {
-            "response": response,
-            "analysis_id": request.analysis_id
-        }
-        
+
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+
+
+# ============================================================
+# ANALYZE PDF
+# ============================================================
+
+@router.post(
+    "/analyze-pdf",
+    response_model=AnalyzeTextResponse,
+)
+async def analyze_pdf(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload and analyze a PDF medical report.
+    """
+
+    user_id = current_user["user_id"]
+
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Filename is required",
+        )
+
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only PDF files are supported",
+        )
+
+    try:
+        file_content = await file.read()
+
+        # Basic upload protection.
+        max_file_size = 10 * 1024 * 1024  # 10 MB
+
+        if len(file_content) > max_file_size:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="PDF file is too large. Maximum size is 10 MB.",
+            )
+
+        if not file_content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded PDF is empty",
+            )
+
+        report_text = extract_text_from_pdf(file_content)
+
+        if not report_text.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unable to extract text from PDF",
+            )
+
+        result = analyze_medical_report(report_text)
+
+        analysis_id = create_analysis(
+            db=db,
+            user_id=user_id,
+            report_text=report_text,
+            analysis=result["analysis"],
+            summary=result["summary"],
+            filename=file.filename,
+        )
+
+        return AnalyzeTextResponse(
+            analysis_id=analysis_id,
+            analysis=result["analysis"],
+            summary=result["summary"],
+        )
+
     except HTTPException:
         raise
-    except Exception as e:
-        print(f"❌ Chat error: {str(e)}")
-        raise HTTPException(status_code=503, detail="AI inference is temporarily unavailable") from e
 
-@router.get("/active/{user_id}")
-async def get_active(user_id: int):
-    """
-    Get active analysis for a user
-    """
-    analysis = get_active_analysis(user_id)
-    if analysis:
-        return {
-            "active": True,
-            "analysis_id": active_sessions.get(user_id),
-            "summary": analysis["summary"]
-        }
-    return {"active": False}
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
 
-@router.get("/history/{user_id}")
-async def get_history(user_id: int):
-    """
-    Get all analyses for a user
-    """
-    analyses = get_user_analyses(user_id)
-    return analyses
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"PDF analysis failed: {str(exc)}",
+        )
 
-@router.delete("/session/{user_id}")
-async def clear_session_endpoint(user_id: int):
+
+# ============================================================
+# CHAT WITH ANALYSIS
+# ============================================================
+
+@router.post(
+    "/chat",
+    response_model=ChatResponse,
+)
+async def chat(
+    request: ChatRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
-    Clear user's active session
+    Ask a question about a previously analyzed report.
     """
-    from app.report_context import clear_session
-    clear_session(user_id)
-    return {"message": "Session cleared"}
+
+    user_id = current_user["user_id"]
+
+    if not request.message.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Message cannot be empty",
+        )
+
+    analysis = get_analysis(
+        db=db,
+        analysis_id=request.analysis_id,
+    )
+
+    if not analysis:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found",
+        )
+
+    # Critical authorization check.
+    if analysis.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this analysis",
+        )
+
+    try:
+        response = answer_question(
+            question=request.message,
+            report_context=analysis.report_text,
+            report_analysis=analysis.analysis,
+        )
+
+        return ChatResponse(
+            response=response,
+            analysis_id=analysis.id,
+        )
+
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+
+
+# ============================================================
+# ANALYSIS HISTORY
+# ============================================================
+
+@router.get("/history")
+async def analysis_history(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Return analysis history for the authenticated user.
+    """
+
+    user_id = current_user["user_id"]
+
+    return {
+        "analyses": get_user_analyses(
+            db=db,
+            user_id=user_id,
+        )
+    }
+
+
+# ============================================================
+# GET SINGLE ANALYSIS
+# ============================================================
 
 @router.get("/analysis/{analysis_id}")
-async def get_analysis_by_id(analysis_id: str, user_id: int):
+async def get_single_analysis(
+    analysis_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
-    Get specific analysis by ID
+    Return a single analysis belonging to the authenticated user.
     """
-    analysis = get_analysis(analysis_id)
-    
+
+    user_id = current_user["user_id"]
+
+    analysis = get_analysis(
+        db=db,
+        analysis_id=analysis_id,
+    )
+
     if not analysis:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-    
-    if analysis["user_id"] != user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found",
+        )
+
+    if analysis.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this analysis",
+        )
+
     return {
-        "id": analysis_id,
-        "filename": analysis.get("filename"),
-        "analysis": analysis["analysis"],
-        "summary": analysis["summary"],
-        "created_at": analysis["created_at"]
+        "id": analysis.id,
+        "filename": analysis.filename,
+        "report_text": analysis.report_text,
+        "analysis": analysis.analysis,
+        "summary": analysis.summary,
+        "created_at": analysis.created_at,
+    }
+
+
+# ============================================================
+# DELETE ANALYSIS
+# ============================================================
+
+@router.delete("/analysis/{analysis_id}")
+async def remove_analysis(
+    analysis_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete an analysis belonging to the authenticated user.
+    """
+
+    user_id = current_user["user_id"]
+
+    deleted = delete_analysis(
+        db=db,
+        analysis_id=analysis_id,
+        user_id=user_id,
+    )
+
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found",
+        )
+
+    return {
+        "message": "Analysis deleted successfully",
+        "analysis_id": analysis_id,
     }

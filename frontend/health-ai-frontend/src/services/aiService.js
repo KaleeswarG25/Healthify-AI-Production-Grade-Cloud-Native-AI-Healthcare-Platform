@@ -1,55 +1,130 @@
-// src/services/aiService.js
 import { aiApi } from './api';
 
+
 class AIService {
-  async analyzeText(userId, reportText, filename = null) {
-    const response = await aiApi.post('/analyze-text', {
-      user_id: userId,
-      report_text: reportText,
-      filename: filename
-    });
-    return response.data;
+
+  async analyzeText(reportText, filename = null) {
+    try {
+      const response = await aiApi.post(
+        '/analyze-text',
+        {
+          report_text: reportText,
+          filename,
+        }
+      );
+
+      return response.data;
+
+    } catch (error) {
+      throw (
+        error.response?.data?.detail ||
+        'Failed to analyze report'
+      );
+    }
   }
 
-  async analyzePdf(userId, file) {
-    const formData = new FormData();
-    formData.append('user_id', userId);
-    formData.append('file', file);
-    
-    const response = await aiApi.post('/analyze-pdf', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-    return response.data;
+
+  async analyzePdf(file) {
+    try {
+      const formData = new FormData();
+
+      formData.append(
+        'file',
+        file
+      );
+
+      const response = await aiApi.post(
+        '/analyze-pdf',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      return response.data;
+
+    } catch (error) {
+      throw (
+        error.response?.data?.detail ||
+        'Failed to analyze PDF'
+      );
+    }
   }
 
-  async sendMessage(userId, message, analysisId) {
-    const response = await aiApi.post('/chat', {
-      user_id: userId,
-      message: message,
-      analysis_id: analysisId
-    });
-    return response.data;
+
+  async sendMessage(message, analysisId) {
+    try {
+      const response = await aiApi.post(
+        '/chat',
+        {
+          message,
+          analysis_id: analysisId,
+        }
+      );
+
+      return response.data;
+
+    } catch (error) {
+      throw (
+        error.response?.data?.detail ||
+        'Failed to send message'
+      );
+    }
   }
 
-  async getActiveAnalysis(userId) {
-    const response = await aiApi.get(`/active/${userId}`);
-    return response.data;
+
+  async getAnalysisHistory() {
+    try {
+      const response = await aiApi.get(
+        '/history'
+      );
+
+      return response.data;
+
+    } catch (error) {
+      throw (
+        error.response?.data?.detail ||
+        'Failed to retrieve analysis history'
+      );
+    }
   }
 
-  async getAnalysisHistory(userId) {
-    const response = await aiApi.get(`/history/${userId}`);
-    return response.data;
+
+  async getAnalysisById(analysisId) {
+    try {
+      const response = await aiApi.get(
+        `/analysis/${analysisId}`
+      );
+
+      return response.data;
+
+    } catch (error) {
+      throw (
+        error.response?.data?.detail ||
+        'Failed to retrieve analysis'
+      );
+    }
   }
 
-  async getAnalysisById(analysisId, userId) {
-    const response = await aiApi.get(`/analysis/${analysisId}?user_id=${userId}`);
-    return response.data;
-  }
 
-  async clearSession(userId) {
-    const response = await aiApi.delete(`/session/${userId}`);
-    return response.data;
+  async deleteAnalysis(analysisId) {
+    try {
+      const response = await aiApi.delete(
+        `/analysis/${analysisId}`
+      );
+
+      return response.data;
+
+    } catch (error) {
+      throw (
+        error.response?.data?.detail ||
+        'Failed to delete analysis'
+      );
+    }
   }
 }
+
 
 export default new AIService();

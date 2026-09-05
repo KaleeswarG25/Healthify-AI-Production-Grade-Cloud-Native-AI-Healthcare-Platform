@@ -1,18 +1,25 @@
-# report-service/app/s3.py
-import boto3
 import os
+
+import boto3
 from botocore.config import Config
-from dotenv import load_dotenv
 
-load_dotenv()
 
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-BUCKET_NAME = os.getenv("S3_BUCKET", "ai-health-reports")
+AWS_REGION = os.getenv("AWS_REGION")
 
-# boto3 resolves credentials from the environment, the local AWS profile, or
-# EKS Pod Identity. Do not require static keys during module import.
+if not AWS_REGION:
+    raise RuntimeError("AWS_REGION environment variable is required")
+
+
+BUCKET_NAME = os.getenv("S3_BUCKET")
+
+if not BUCKET_NAME:
+    raise RuntimeError("S3_BUCKET environment variable is required")
+
+
 s3_client = boto3.client(
     "s3",
     region_name=AWS_REGION,
-    config=Config(signature_version="s3v4"),
+    config=Config(
+        signature_version="s3v4"
+    ),
 )

@@ -1,15 +1,15 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Column, DateTime, Integer, String, Text
 
 from .database import Base
 
 
-class MedicalReport(Base):
-    __tablename__ = "medical_reports"
+class Analysis(Base):
+    __tablename__ = "analyses"
 
     id = Column(
-        Integer,
+        String(36),
         primary_key=True,
         index=True,
     )
@@ -20,17 +20,27 @@ class MedicalReport(Base):
         index=True,
     )
 
-    file_name = Column(
+    filename = Column(
         String(255),
+        nullable=True,
+    )
+
+    report_text = Column(
+        Text,
         nullable=False,
     )
 
-    s3_url = Column(
-        String(1024),
+    analysis = Column(
+        Text,
         nullable=False,
     )
 
-    uploaded_at = Column(
+    summary = Column(
+        Text,
+        nullable=False,
+    )
+
+    created_at = Column(
         DateTime,
         nullable=False,
         default=datetime.utcnow,
