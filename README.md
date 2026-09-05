@@ -278,6 +278,7 @@ See [docs/ARGOCD.md](docs/ARGOCD.md) for complete setup.
 - [Local Development](docs/LOCAL_SETUP.md)
 - [AWS Deployment](docs/AWS_DEPLOYMENT.md)
 - [Kubernetes Setup](docs/KUBERNETES.md)
+- [Deployment Incident Handoff](docs/DEPLOYMENT_INCIDENT_HANDOFF.md)
 - [GitOps with ArgoCD](docs/ARGOCD.md)
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
 - [System Architecture](docs/ARCHITECTURE.md)

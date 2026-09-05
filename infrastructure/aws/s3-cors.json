@@ -1,0 +1,28 @@
+{
+  "CORSRules": [
+    {
+      "ID": "healthify-browser-upload",
+      "AllowedOrigins": [
+        "http://k8s-aihealth-healthif-cdfae1a745-1238636594.ap-south-1.elb.amazonaws.com",
+        "http://localhost:3000",
+        "http://localhost:80"
+      ],
+      "AllowedMethods": [
+        "GET",
+        "PUT",
+        "HEAD"
+      ],
+      "AllowedHeaders": [
+        "Content-Type",
+        "Authorization",
+        "x-amz-*"
+      ],
+      "ExposeHeaders": [
+        "ETag",
+        "x-amz-request-id",
+        "x-amz-id-2"
+      ],
+      "MaxAgeSeconds": 3000
+    }
+  ]
+}

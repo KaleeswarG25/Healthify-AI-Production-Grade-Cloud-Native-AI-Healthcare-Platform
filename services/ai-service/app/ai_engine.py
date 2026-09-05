@@ -8,6 +8,8 @@ load_dotenv()
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
 MODEL = os.getenv("OLLAMA_MODEL", "llama2")
+NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "4096"))
+NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "256"))
 
 def generate_ai_response(prompt: str, system_prompt: str = None) -> str:
     """
@@ -17,14 +19,18 @@ def generate_ai_response(prompt: str, system_prompt: str = None) -> str:
         payload = {
             "model": MODEL,
             "prompt": prompt,
-            "stream": False
+            "stream": False,
+            "options": {
+                "num_ctx": NUM_CTX,
+                "num_predict": NUM_PREDICT,
+            },
         }
         
         if system_prompt:
             payload["system"] = system_prompt
         
         print(f"📤 Sending to Ollama with model: {MODEL}")
-        response = requests.post(OLLAMA_URL, json=payload, timeout=60)
+        response = requests.post(OLLAMA_URL, json=payload, timeout=300)
         response.raise_for_status()
         
         data = response.json()
@@ -35,7 +41,7 @@ def generate_ai_response(prompt: str, system_prompt: str = None) -> str:
         return "⚠️ AI service unavailable. Please ensure Ollama is running."
     except Exception as e:
         print(f"❌ AI Engine Error: {str(e)}")
-        return f"⚠️ Error generating response: {str(e)}"
+        raise RuntimeError(f"Ollama generation failed: {str(e)}") from e
 
 def analyze_medical_report(report_text: str) -> Dict[str, Any]:
     """

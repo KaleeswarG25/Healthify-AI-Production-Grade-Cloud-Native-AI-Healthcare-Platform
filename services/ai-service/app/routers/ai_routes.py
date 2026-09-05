@@ -45,7 +45,7 @@ async def analyze_text(request: AnalyzeTextRequest):
         
     except Exception as e:
         print(f"❌ Analysis error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=503, detail="AI inference is temporarily unavailable") from e
 
 @router.post("/analyze-pdf")
 async def analyze_pdf(
@@ -89,7 +89,7 @@ async def analyze_pdf(
         
     except Exception as e:
         print(f"❌ PDF Analysis error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=503, detail="AI inference is temporarily unavailable") from e
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
@@ -129,7 +129,7 @@ async def chat(request: ChatRequest):
         raise
     except Exception as e:
         print(f"❌ Chat error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=503, detail="AI inference is temporarily unavailable") from e
 
 @router.get("/active/{user_id}")
 async def get_active(user_id: int):
