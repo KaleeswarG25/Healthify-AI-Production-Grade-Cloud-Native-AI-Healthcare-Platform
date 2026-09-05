@@ -1,0 +1,35 @@
+aws_region  = "ap-south-1"
+environment = "production"
+
+project_name = "healthify"
+
+vpc_cidr = "10.20.0.0/16"
+
+eks_version = "1.33"
+
+general_instance_types = [
+  "t3.large"
+]
+
+gpu_instance_types = [
+  "g4dn.xlarge"
+]
+
+general_min_size     = 2
+general_max_size     = 4
+general_desired_size = 2
+
+gpu_min_size     = 0
+gpu_max_size     = 1
+gpu_desired_size = 0
+
+rds_instance_class    = "db.t4g.micro"
+rds_allocated_storage = 20
+rds_database_name     = "healthai"
+
+rds_username = "CHANGE_ME"
+rds_password = "CHANGE_ME"
+
+s3_bucket_name = "CHANGE_ME_TO_GLOBALLY_UNIQUE_NAME"
+
+github_repository = "KaleeswarG25/healthify_AI"
