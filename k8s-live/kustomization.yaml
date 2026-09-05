@@ -5,16 +5,16 @@ resources:
 images:
   - name: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-auth
     newName: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-auth
-    newTag: latest
+    newTag: 2cf357682451b07e1e7e7449eb425c8f273d6138
   - name: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-report
     newName: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-report
-    newTag: latest
+    newTag: 2cf357682451b07e1e7e7449eb425c8f273d6138
   - name: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-ai
     newName: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-ai
-    newTag: latest
+    newTag: 2cf357682451b07e1e7e7449eb425c8f273d6138
   - name: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-gateway
     newName: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-gateway
-    newTag: latest
+    newTag: 2cf357682451b07e1e7e7449eb425c8f273d6138
   - name: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-frontend
     newName: 124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-frontend
-    newTag: latest
+    newTag: 2cf357682451b07e1e7e7449eb425c8f273d6138
