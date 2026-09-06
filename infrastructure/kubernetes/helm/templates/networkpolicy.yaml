@@ -1,3 +1,10 @@
+# ============================================================
+# HEALTHIFY NETWORK POLICIES
+# ============================================================
+
+# ------------------------------------------------------------
+# 1. Default deny ingress
+# ------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -9,6 +16,9 @@ spec:
     - Ingress
 
 ---
+# ------------------------------------------------------------
+# 2. Default deny egress
+# ------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -20,6 +30,11 @@ spec:
     - Egress
 
 ---
+# ------------------------------------------------------------
+# 3. Gateway ingress
+# ------------------------------------------------------------
+# Gateway will eventually receive traffic from the ALB.
+# ALB -> Gateway is intentionally allowed here.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -35,6 +50,9 @@ spec:
     - {}
 
 ---
+# ------------------------------------------------------------
+# 4. Gateway -> internal services
+# ------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -47,6 +65,8 @@ spec:
   policyTypes:
     - Egress
   egress:
+
+    # Gateway -> Frontend
     - to:
         - podSelector:
             matchLabels:
@@ -55,6 +75,7 @@ spec:
         - protocol: TCP
           port: 80
 
+    # Gateway -> Auth
     - to:
         - podSelector:
             matchLabels:
@@ -63,6 +84,7 @@ spec:
         - protocol: TCP
           port: 8000
 
+    # Gateway -> Report
     - to:
         - podSelector:
             matchLabels:
@@ -71,6 +93,7 @@ spec:
         - protocol: TCP
           port: 8001
 
+    # Gateway -> AI
     - to:
         - podSelector:
             matchLabels:
@@ -79,6 +102,7 @@ spec:
         - protocol: TCP
           port: 8002
 
+    # DNS
     - to:
         - namespaceSelector: {}
       ports:
@@ -89,6 +113,9 @@ spec:
           port: 53
 
 ---
+# ------------------------------------------------------------
+# 5. Frontend <- Gateway
+# ------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -110,6 +137,9 @@ spec:
           port: 80
 
 ---
+# ------------------------------------------------------------
+# 6. Auth <- Gateway
+# ------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -131,6 +161,9 @@ spec:
           port: 8000
 
 ---
+# ------------------------------------------------------------
+# 7. Report <- Gateway
+# ------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -152,6 +185,9 @@ spec:
           port: 8001
 
 ---
+# ------------------------------------------------------------
+# 8. AI <- Gateway
+# ------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -173,6 +209,157 @@ spec:
           port: 8002
 
 ---
+# ------------------------------------------------------------
+# 9. Auth -> RDS PostgreSQL
+# ------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: auth-to-rds
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: auth-service
+  policyTypes:
+    - Egress
+  egress:
+
+    # RDS private subnets
+    - to:
+        - ipBlock:
+            cidr: 10.20.48.0/20
+        - ipBlock:
+            cidr: 10.20.64.0/20
+        - ipBlock:
+            cidr: 10.20.80.0/20
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# ------------------------------------------------------------
+# 10. Report -> RDS PostgreSQL
+# ------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: report-to-rds
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: report-service
+  policyTypes:
+    - Egress
+  egress:
+
+    # RDS private subnets
+    - to:
+        - ipBlock:
+            cidr: 10.20.48.0/20
+        - ipBlock:
+            cidr: 10.20.64.0/20
+        - ipBlock:
+            cidr: 10.20.80.0/20
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# ------------------------------------------------------------
+# 11. AI -> RDS PostgreSQL
+# ------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ai-to-rds
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: ai-service
+  policyTypes:
+    - Egress
+  egress:
+
+    # RDS private subnets
+    - to:
+        - ipBlock:
+            cidr: 10.20.48.0/20
+        - ipBlock:
+            cidr: 10.20.64.0/20
+        - ipBlock:
+            cidr: 10.20.80.0/20
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# ------------------------------------------------------------
+# 12. Report -> S3 via HTTPS
+# ------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: report-to-s3
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: report-service
+  policyTypes:
+    - Egress
+  egress:
+
+    # HTTPS to AWS S3 through NAT Gateway
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# ------------------------------------------------------------
+# 13. AI -> Ollama
+# ------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -185,6 +372,7 @@ spec:
   policyTypes:
     - Egress
   egress:
+
     - to:
         - podSelector:
             matchLabels:
@@ -193,16 +381,19 @@ spec:
         - protocol: TCP
           port: 11434
 
+    # DNS
     - to:
         - namespaceSelector: {}
       ports:
         - protocol: UDP
           port: 53
-
         - protocol: TCP
           port: 53
 
 ---
+# ------------------------------------------------------------
+# 14. Ollama <- AI
+# ------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -222,4 +413,3 @@ spec:
       ports:
         - protocol: TCP
           port: 11434
-          
