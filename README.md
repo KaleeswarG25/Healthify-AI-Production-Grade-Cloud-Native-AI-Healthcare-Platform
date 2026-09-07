@@ -157,7 +157,34 @@ healthify_AI/
     ├── health-checks.sh
     └── smoke-tests.sh
 ```
-
+Developer
+   ↓
+GitHub
+   ↓
+GitHub Actions
+   ↓
+Security Scanning
+   ↓
+Docker
+   ↓
+Amazon ECR
+   ↓
+Argo CD
+   ↓
+Amazon EKS
+   ↓
+Microservices
+   ↓
+┌───────────────┐
+│ Auth          │
+│ Report        │
+│ AI            │
+│ Gateway       │
+│ Frontend      │
+└───────────────┘
+   ↓       ↓
+  RDS      S3
+  
 ## Quick Start
 
 ### 1. Local Development
