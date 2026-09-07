@@ -4,12 +4,15 @@ imagePullSecrets: []
 
 frontend:
   image:
-    repository: ""
-    tag: "latest"
+    repository: "124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-frontend"
+    tag: "v4"
     pullPolicy: IfNotPresent
+
   replicas: 2
+
   service:
     port: 80
+
   resources:
     requests:
       cpu: 100m
@@ -17,15 +20,19 @@ frontend:
     limits:
       cpu: 500m
       memory: 256Mi
+
 
 gateway:
   image:
-    repository: ""
-    tag: "latest"
+    repository: "124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-gateway"
+    tag: "v3"
     pullPolicy: IfNotPresent
+
   replicas: 2
+
   service:
     port: 80
+
   resources:
     requests:
       cpu: 100m
@@ -34,14 +41,18 @@ gateway:
       cpu: 500m
       memory: 256Mi
 
+
 auth:
   image:
-    repository: ""
-    tag: "latest"
+    repository: "124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-auth"
+    tag: "v1"
     pullPolicy: IfNotPresent
+
   replicas: 2
+
   service:
     port: 8000
+
   resources:
     requests:
       cpu: 100m
@@ -49,15 +60,19 @@ auth:
     limits:
       cpu: 500m
       memory: 512Mi
+
 
 report:
   image:
-    repository: ""
-    tag: "latest"
+    repository: "124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-report"
+    tag: "v2"
     pullPolicy: IfNotPresent
+
   replicas: 2
+
   service:
     port: 8001
+
   resources:
     requests:
       cpu: 100m
@@ -66,14 +81,18 @@ report:
       cpu: 500m
       memory: 512Mi
 
+
 ai:
   image:
-    repository: ""
-    tag: "latest"
+    repository: "124502390077.dkr.ecr.ap-south-1.amazonaws.com/healthify-ai"
+    tag: "v2"
     pullPolicy: IfNotPresent
+
   replicas: 1
+
   service:
     port: 8002
+
   resources:
     requests:
       cpu: 250m
@@ -82,17 +101,22 @@ ai:
       cpu: "1"
       memory: 1Gi
 
+
 ollama:
   image:
-    repository: ollama/ollama
+    repository: "ollama/ollama"
     tag: "latest"
     pullPolicy: IfNotPresent
+
   replicas: 1
+
   service:
     port: 11434
+
   storage:
     size: 20Gi
     storageClass: gp3
+
   resources:
     requests:
       cpu: "1"
@@ -101,24 +125,29 @@ ollama:
       cpu: "2"
       memory: 4Gi
 
+
 database:
   host: ""
   port: 5432
   name: healthai
 
+
 s3:
-  bucket: ""
+  bucket: "weareavengeres"
   region: ap-south-1
+
 
 secrets:
   create: false
   existingSecret: healthify-secrets
+
 
 autoscaling:
   enabled: true
   minReplicas: 2
   maxReplicas: 5
   targetCPUUtilizationPercentage: 70
+
 
 podDisruptionBudget:
   enabled: true
