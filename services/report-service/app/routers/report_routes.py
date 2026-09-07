@@ -1,7 +1,7 @@
-import os
 import uuid
 from typing import Generator
 
+from botocore.exceptions import ClientError
 from fastapi import (
     APIRouter,
     Depends,
@@ -24,6 +24,14 @@ from app.security import get_current_user
 
 router = APIRouter()
 
+MAX_FILE_SIZE = 10 * 1024 * 1024
+
+ALLOWED_FILE_TYPES = {
+    "application/pdf": ".pdf",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+}
+
 
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
@@ -43,27 +51,19 @@ def get_db() -> Generator[Session, None, None]:
     response_model=PresignedUrlResponse,
 )
 async def generate_upload_url(
-    file_name: str = Query(...),
+    file_name: str = Query(..., min_length=1, max_length=255),
     content_type: str = Query(...),
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["user_id"]
 
-    allowed_types = {
-        "application/pdf": ".pdf",
-        "image/jpeg": ".jpg",
-        "image/png": ".png",
-    }
-
-    if content_type not in allowed_types:
+    if content_type not in ALLOWED_FILE_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only PDF, JPEG and PNG files are supported",
         )
 
-    extension = allowed_types[content_type]
-
-    safe_name = os.path.basename(file_name)
+    extension = ALLOWED_FILE_TYPES[content_type]
 
     file_key = (
         f"users/{user_id}/reports/"
@@ -81,17 +81,17 @@ async def generate_upload_url(
             ExpiresIn=300,
         )
 
-        return PresignedUrlResponse(
-            upload_url=upload_url,
-            file_key=file_key,
-            expires_in=300,
+    except ClientError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to generate upload URL",
         )
 
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unable to generate upload URL: {str(exc)}",
-        )
+    return PresignedUrlResponse(
+        upload_url=upload_url,
+        file_key=file_key,
+        expires_in=300,
+    )
 
 
 # ============================================================
@@ -123,28 +123,43 @@ async def save_report(
             Key=request.file_key,
         )
 
-        file_size = metadata.get("ContentLength", 0)
+    except ClientError as exc:
+        error_code = exc.response.get(
+            "Error",
+            {}
+        ).get("Code")
 
-        max_size = 10 * 1024 * 1024
+        if error_code in {"404", "NoSuchKey", "NotFound"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded file does not exist",
+            )
 
-        if file_size > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to verify uploaded file",
+        )
+
+    file_size = metadata.get("ContentLength", 0)
+
+    if file_size <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty",
+        )
+
+    if file_size > MAX_FILE_SIZE:
+        try:
             s3_client.delete_object(
                 Bucket=BUCKET_NAME,
                 Key=request.file_key,
             )
+        except ClientError:
+            pass
 
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail="File exceeds the 10 MB limit",
-            )
-
-    except HTTPException:
-        raise
-
-    except Exception:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uploaded file does not exist",
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="File exceeds the 10 MB limit",
         )
 
     report = MedicalReport(
@@ -176,8 +191,12 @@ async def get_user_reports(
 
     reports = (
         db.query(MedicalReport)
-        .filter(MedicalReport.user_id == user_id)
-        .order_by(MedicalReport.uploaded_at.desc())
+        .filter(
+            MedicalReport.user_id == user_id
+        )
+        .order_by(
+            MedicalReport.uploaded_at.desc()
+        )
         .all()
     )
 
@@ -188,7 +207,9 @@ async def get_user_reports(
 # DELETE REPORT
 # ============================================================
 
-@router.delete("/reports/{report_id}")
+@router.delete(
+    "/reports/{report_id}"
+)
 async def delete_report(
     report_id: int,
     current_user: dict = Depends(get_current_user),
@@ -211,21 +232,26 @@ async def delete_report(
             detail="Report not found",
         )
 
-    try:
-        s3_key = report.s3_url.split(
-            f"s3://{BUCKET_NAME}/",
-            1,
-        )[1]
+    prefix = f"s3://{BUCKET_NAME}/"
 
+    if not report.s3_url.startswith(prefix):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid stored S3 reference",
+        )
+
+    s3_key = report.s3_url[len(prefix):]
+
+    try:
         s3_client.delete_object(
             Bucket=BUCKET_NAME,
             Key=s3_key,
         )
 
-    except Exception as exc:
+    except ClientError:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unable to delete S3 object: {str(exc)}",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to delete report from storage",
         )
 
     db.delete(report)
