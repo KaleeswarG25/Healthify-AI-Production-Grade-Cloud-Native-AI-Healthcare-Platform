@@ -9,12 +9,14 @@ COPY . .
 RUN npm run build
 
 
-FROM nginxinc/nginx-unprivileged:1.29-alpine
+FROM nginx:1.29-alpine
 
 COPY --from=builder /app/build /usr/share/nginx/html
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/nginx.conf
 
 EXPOSE 8080
+
+USER nginx
 
 CMD ["nginx", "-g", "daemon off;"]

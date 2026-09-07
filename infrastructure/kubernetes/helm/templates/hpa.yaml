@@ -63,6 +63,7 @@ spec:
           averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
 
 ---
+---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -79,9 +80,9 @@ spec:
     - type: Resource
       resource:
         name: cpu
-      target:
-        type: Utilization
-        averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
 
 ---
 apiVersion: autoscaling/v2

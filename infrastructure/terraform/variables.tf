@@ -124,3 +124,6 @@ variable "github_repository" {
   type        = string
   default     = "KaleeswarG25/healthify_AI"
 }
+variable "rds_backup_retention_period" {
+  default = 7
+}

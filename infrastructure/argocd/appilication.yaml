@@ -1,22 +1,32 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
+
 metadata:
-  name: aihealth
+  name: healthify
   namespace: argocd
-  labels:
-    app: aihealth
+
 spec:
-  project: default
+  project: healthify
+
   source:
     repoURL: https://github.com/KaleeswarG25/healthify_AI.git
-    path: k8s-live
     targetRevision: master
+    path: infrastructure/kubernetes/helm
+
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-prod.yaml
+
   destination:
     server: https://kubernetes.default.svc
-    namespace: aihealth
+    namespace: healthify
+
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true

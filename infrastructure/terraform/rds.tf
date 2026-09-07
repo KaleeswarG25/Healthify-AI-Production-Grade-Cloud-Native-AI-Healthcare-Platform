@@ -72,7 +72,7 @@ resource "aws_db_instance" "healthify" {
 
   storage_encrypted = true
 
-  backup_retention_period = 7
+  backup_retention_period = var.rds_backup_retention_period
 
   backup_window = "18:00-19:00"
 

@@ -97,6 +97,27 @@ resource "aws_iam_role_policy" "github_actions_ecr" {
     ]
   })
 }
+
+data "tls_certificate" "eks_oidc" {
+  url = aws_eks_cluster.healthify.identity[0].oidc[0].issuer
+}
+
+resource "aws_iam_openid_connect_provider" "eks" {
+  url = aws_eks_cluster.healthify.identity[0].oidc[0].issuer
+
+  client_id_list = [
+    "sts.amazonaws.com"
+  ]
+
+  thumbprint_list = [
+    data.tls_certificate.eks_oidc.certificates[0].sha1_fingerprint
+  ]
+
+  tags = {
+    Name = "${var.project_name}-eks-oidc"
+  }
+}
+
 data "aws_iam_policy_document" "report_s3" {
   statement {
     effect = "Allow"
@@ -192,24 +213,37 @@ resource "aws_eks_pod_identity_association" "report" {
     aws_eks_addon.pod_identity_agent
   ]
 }
+
 data "aws_iam_policy_document" "ebs_csi_assume_role" {
   statement {
     effect = "Allow"
 
     principals {
-      type = "Service"
+      type = "Federated"
 
       identifiers = [
-        "pods.eks.amazonaws.com"
+        aws_iam_openid_connect_provider.eks.arn
       ]
     }
 
     actions = [
-      "sts:AssumeRole",
-      "sts:TagSession"
+      "sts:AssumeRoleWithWebIdentity"
     ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub"
+      values   = ["system:serviceaccount:kube-system:ebs-csi-controller-sa"]
+    }
   }
 }
+
 
 
 resource "aws_iam_role" "ebs_csi" {
@@ -257,3 +291,10 @@ output "report_s3_role_arn" {
 output "ebs_csi_role_arn" {
   value = aws_iam_role.ebs_csi.arn
 }
+
+resource "aws_eks_addon" "pod_identity_agent" {
+  cluster_name  = aws_eks_cluster.healthify.name # <-- Update this line
+  addon_name    = "eks-pod-identity-agent"
+  addon_version = "v1.3.0-eksbuild.1"
+}
+

@@ -284,3 +284,15 @@ temp/
 # Application specific
 health-ai-frontend/build/
 health-ai-frontend/.env*
+terraform.tfvars
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+terraform.tfvars
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log

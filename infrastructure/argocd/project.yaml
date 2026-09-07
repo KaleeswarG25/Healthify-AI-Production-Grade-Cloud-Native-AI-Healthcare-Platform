@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: healthify
+  namespace: argocd
+spec:
+  description: Healthify AI GitOps project
+
+  sourceRepos:
+    - https://github.com/KaleeswarG25/healthify_AI.git
+
+  destinations:
+    - namespace: healthify
+      server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
