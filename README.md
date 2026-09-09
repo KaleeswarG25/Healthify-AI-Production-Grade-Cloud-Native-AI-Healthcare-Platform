@@ -51,6 +51,7 @@ Amazon EKS
     ▼
 Healthify AI Platform
 ```
+<img width="1408" height="768" alt="Gemini_Generated_Image_heb6ygheb6ygheb6" src="https://github.com/user-attachments/assets/471e0c1d-fb88-4963-85f4-2bb506d02912" />
 
 ---
 
