@@ -29,7 +29,6 @@ GitHub Actions CI
     ├── Python validation
     ├── Frontend build
     ├── Helm lint
-    └── Trivy security scan
     │
     ▼
 Merge to master
@@ -38,9 +37,7 @@ Merge to master
 GitHub Actions CD
     │
     ├── Build Docker images
-    ├── Trivy image scanning
     ├── Push images to Amazon ECR
-    └── Promote immutable image SHA
     │
     ▼
 GitOps Commit
@@ -160,8 +157,8 @@ Healthify AI Platform
                                                ▼
                                          Amazon S3
                                               
-                            │
-                            ▼
+                            
+                            
                        AI Service
                          FastAPI
                             │
